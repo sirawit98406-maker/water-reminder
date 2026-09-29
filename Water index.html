@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hydration Reminder</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #0f172a;
+    }
+
+    .container {
+      background: #ffffff;
+      padding: 2.5rem;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+    }
+
+    .icon {
+      font-size: 3.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      color: #0284c7;
+      margin-bottom: 1.5rem;
+    }
+
+    .timer-display {
+      font-size: 3rem;
+      font-weight: 700;
+      color: #0369a1;
+      background: #f0f9ff;
+      padding: 1rem;
+      border-radius: 12px;
+      border: 2px solid #bae6fd;
+      margin-bottom: 1.5rem;
+      letter-spacing: 2px;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .interval-selector {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.95rem;
+      color: #334155;
+    }
+
+    select {
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    button {
+      padding: 0.8rem 1.2rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background-color: #0284c7;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #0369a1;
+    }
+
+    .btn-secondary {
+      background-color: #e2e8f0;
+      color: #334155;
+    }
+
+    .btn-secondary:hover {
+      background-color: #cbd5e1;
+    }
+
+    .log {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-top: 1rem;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="icon">💧</div>
+    <h1>Water Reminder</h1>
+
+    <div class="timer-display" id="timer">30:00</div>
+
+    <div class="controls">
+      <div class="interval-selector">
+        <label for="interval">Set Interval:</label>
+        <select id="interval">
+          <option value="15">15 Minutes</option>
+          <option value="30" selected>30 Minutes</option>
+          <option value="45">45 Minutes</option>
+          <option value="60">60 Minutes</option>
+        </select>
+      </div>
+
+      <button id="startBtn" class="btn-primary">Start Reminder</button>
+      <button id="resetBtn" class="btn-secondary">Reset Timer</button>
+    </div>
+
+    <div class="log" id="statusLog">Click "Start Reminder" to begin tracking.</div>
+  </div>
+
+  <script>
+    let timerInterval = null;
+    let totalSeconds = 30 * 60;
+    let isRunning = false;
+
+    const timerDisplay = document.getElementById('timer');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const intervalSelect = document.getElementById('interval');
+    const statusLog = document.getElementById('statusLog');
+
+    // Simple chime sound using Web Audio API
+    function playChime() {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.3); // A5 note
+
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.8);
+    }
+
+    function requestNotificationPermission() {
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
+      }
+    }
+
+    function sendNotification() {
+      playChime();
+      
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Time to Drink Water! 💧', {
+          body: 'Stay hydrated! Drink a glass of water now to keep your energy up.',
+          icon: 'https://cdn-icons-png.flaticon.com/512/3105/3105807.png'
+        });
+      } else {
+        alert('Time to Drink Water! 💧');
+      }
+    }
+
+    function updateDisplay() {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      timerDisplay.textContent = 
+        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function startTimer() {
+      requestNotificationPermission();
+
+      if (isRunning) {
+        // Pause timer
+        clearInterval(timerInterval);
+        isRunning = false;
+        startBtn.textContent = 'Resume Reminder';
+        statusLog.textContent = 'Timer paused.';
+      } else {
+        // Start timer
+        isRunning = true;
+        startBtn.textContent = 'Pause Reminder';
+        statusLog.textContent = 'Tracking active! Keep this tab open in the background.';
+
+        timerInterval = setInterval(() => {
+          if (totalSeconds > 0) {
+            totalSeconds--;
+            updateDisplay();
+          } else {
+            sendNotification();
+            resetTimer();
+            startTimer(); // Loop back automatically
+          }
+        }, 1000);
+      }
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      isRunning = false;
+      const selectedMinutes = parseInt(intervalSelect.value, 10);
+      totalSeconds = selectedMinutes * 60;
+      startBtn.textContent = 'Start Reminder';
+      statusLog.textContent = 'Timer reset.';
+      updateDisplay();
+    }
+
+    intervalSelect.addEventListener('change', () => {
+      resetTimer();
+    });
+
+    startBtn.addEventListener('click', startTimer);
+    resetBtn.addEventListener('click', resetTimer);
+
+    // Initial Setup
+    updateDisplay();
+  </script>
+</body>
+</html>
